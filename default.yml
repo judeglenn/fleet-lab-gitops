@@ -1,5 +1,8 @@
 agent_options:
 controls:
+  apple_settings:
+    configuration_profiles:
+      - path: ./lib/macos/firewall.mobileconfig
 custom_host_vitals:
 labels:
 - description: macOS hosts on Apple Silicon architecture
