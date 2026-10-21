@@ -74,7 +74,7 @@ org_settings:
     ai_features_disabled: false
     deferred_save_host: false
     discard_reports_data: false
-    enable_analytics: true
+    enable_analytics: false
     live_reporting_disabled: false
     report_cap: 0
     scripts_disabled: false
