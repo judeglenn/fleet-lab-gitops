@@ -81,7 +81,7 @@ org_settings:
     live_reporting_disabled: false
     report_cap: 0
     scripts_disabled: false
-    server_url: https://fleet-production-f05c.up.railway.app
+    server_url: $FLEET_URL
   sso_settings:
   webhook_settings:
     activities_webhook:
