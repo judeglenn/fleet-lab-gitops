@@ -3,6 +3,8 @@ controls:
   apple_settings:
     configuration_profiles:
       - path: ./lib/macos/firewall.mobileconfig
+  scripts:
+    - path: ./lib/linux/scripts/linux-ufw-enable.sh
 custom_host_vitals:
 labels:
 - description: macOS hosts on Apple Silicon architecture
@@ -103,4 +105,5 @@ org_settings:
       host_batch_size: 0
   yara_rules:
 policies:
+- path: ./lib/linux/policies/ufw-enabled.policies.yml
 reports:

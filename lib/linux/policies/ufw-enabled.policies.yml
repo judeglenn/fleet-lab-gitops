@@ -1,0 +1,15 @@
+- name: Linux - Firewall (ufw) enabled
+  platform: linux
+  critical: false
+  description: >-
+    Checks that ufw is installed and set to enabled, so the host drops
+    unsolicited inbound traffic. Reads /etc/ufw/ufw.conf, which `ufw enable`
+    and `ufw disable` update. Fails if ufw is missing or disabled.
+  resolution: >-
+    Run the linux-ufw-enable.sh script on this host (host details, Actions,
+    Run script). It allows SSH on 22/tcp first, sets inbound to deny and
+    outbound to allow, then enables ufw.
+  query: >-
+    SELECT 1 FROM file_lines
+    WHERE path = '/etc/ufw/ufw.conf'
+    AND line LIKE 'ENABLED=yes%';
