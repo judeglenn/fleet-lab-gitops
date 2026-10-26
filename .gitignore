@@ -1,0 +1,5 @@
+# Fleet agent packages contain the enroll secret
+*.deb
+*.rpm
+*.pkg
+*.msi
