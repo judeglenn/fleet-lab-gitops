@@ -2,7 +2,7 @@
 
 A self-hosted [Fleet](https://fleetdm.com) lab where device management configuration is managed as code. I built it to practice the change discipline used for production fleets: every change is reviewed, validated automatically, applied automatically, and corrected if it drifts.
 
-This is a home lab. It manages one macOS virtual machine. The limits are listed below.
+This is a home lab. It manages one macOS virtual machine and one Ubuntu Server virtual machine. The limits are listed below.
 
 ## Architecture
 
@@ -16,12 +16,14 @@ flowchart LR
     Fleet --- MySQL[(MySQL)]
     Fleet --- Redis[(Redis)]
     Fleet <-->|MDM and osquery| Host[macOS 27 VM]
+    Fleet <-->|osquery and scripts| Linux[Ubuntu 26.04 VM]
 ```
 
 - **Fleet server:** `fleetdm/fleet` container on Railway, pinned to an exact version.
 - **MySQL and Redis:** Railway services, pinned to exact versions, reachable only over Railway's private network. No public access.
 - **Apple MDM:** enabled with an APNs certificate issued to a personal Apple ID.
-- **Host:** one macOS 27 virtual machine running fleetd, used as the canary.
+- **macOS host:** one macOS 27 virtual machine running fleetd, used as the canary.
+- **Linux host:** one Ubuntu Server 26.04 LTS virtual machine (ARM64, UTM) running fleetd with scripts enabled. LUKS full-disk encryption, which Fleet reports as on. Linux has no MDM channel, so every setting is a policy that checks state plus a script that fixes it.
 - **Image auto-updates are off for Fleet, MySQL, and Redis.** A version change is a deliberate change.
 
 ## How a change ships
@@ -52,7 +54,11 @@ Fleet's starter GitHub Action installs a `fleetctl` version matched to the serve
 
 I removed both fallbacks in [`.github/gitops-action/action.yml`](.github/gitops-action/action.yml). Now, if the server version can't be read or the matching `fleetctl` can't be installed, the job stops. For a tool that pushes configuration to every managed device, a run with an unverified tool version should fail, not proceed.
 
-## Example change
+**Agent packages can't be committed**
+
+`fleetctl package` writes the agent installer into the current directory, and that installer contains the enroll secret. While enrolling the Linux host, one landed in this repo's folder. It was moved out before any commit, and [pull request #5](https://github.com/judeglenn/fleet-lab-gitops/pull/5) added a `.gitignore` for `.deb`, `.rpm`, `.pkg`, and `.msi` files. Tested by copying a package back into the folder: `git status` stayed clean.
+
+## Example changes
 
 **Disable Fleet usage analytics** ([pull request #1](https://github.com/judeglenn/fleet-lab-gitops/pull/1)).
 
@@ -61,14 +67,23 @@ I removed both fallbacks in [`.github/gitops-action/action.yml`](.github/gitops-
 - Pull request run: dry run only. Merge run: applied.
 - Verified afterward in Fleet under Settings, Organization settings, Usage statistics: unchecked. My predicted location in the pull request was wrong (I expected Advanced options).
 
+**Enforce a firewall on the Linux host** ([pull request #6](https://github.com/judeglenn/fleet-lab-gitops/pull/6)).
+
+- Change: a policy, **Linux - Firewall (ufw) enabled**, that reads `/etc/ufw/ufw.conf` through Fleet's `file_lines` table, plus `linux-ufw-enable.sh`, which allows SSH, denies other inbound traffic, and enables ufw.
+- Before merging: ran the policy query live on the host. No rows, as expected with ufw disabled. The dry run listed one new policy and one new script.
+- After the apply: the policy showed **Fail** on the host. Ran the script from the host's Actions menu. Output showed `Status: active` with `22/tcp ALLOW IN`.
+- Verified: SSH from the Mac still connected through the firewall, the same live query returned one row, and after a refetch the policy showed **Pass**.
+- What I learned: the policy did not update when the script finished. Fleet re-checks policies on its own schedule, so a refetch was needed to see the new result.
+
 ## Limits
 
-- **Scale.** One VM. This shows the workflow, not fleet-scale operation.
+- **Scale.** Two VMs. This shows the workflow, not fleet-scale operation.
 - **Solo review.** Pull requests require zero approvals, because GitHub doesn't let you approve your own. Branch protection still blocks direct pushes, and CI still gates every merge.
 - **Admin CI token.** On Fleet's free tier, the CI user has to be a global admin. A narrower GitOps role is a Premium feature. The token lives only in GitHub secrets.
 - **Console not locked.** Fleet's GitOps-only console mode is Premium. Changes made in the console are overwritten by the next apply, but they are not blocked.
 - **Drift is corrected, not detected.** Fleet's dry-run output lists every section it would apply, including "would've updated 4 labels" on a configuration exported from the live server. It doesn't show what actually differs, so the nightly run fixes drift without reporting it.
-- **No profile enforced on a device yet.** A firewall profile is defined in this repo and listed in Fleet, but it has not been delivered to the VM. See the open issue below.
+- **Remediation is manual.** Running a script automatically when a policy fails is a Premium feature, and so is targeting a policy by label. On the free tier, the Linux policy detects and flags, a person runs the fix from Fleet, and the policy is scoped by platform rather than label. Scripts are also listed for every host, macOS included, so Linux scripts carry a `linux-` prefix.
+- **No macOS profile enforced on a device yet.** A firewall profile is defined in this repo and listed in Fleet, but it has not been delivered to the macOS VM. See the open issue below. The Linux firewall policy is enforced and verified.
 
 ## Open issue: profile delivery
 
@@ -104,5 +119,6 @@ Lessons:
 - Enroll a physical Mac to confirm or rule out the push token cause.
 - Add drift detection: export the live configuration nightly, diff it against the repo, and fail with the diff before re-applying.
 - Roll back a deliberately bad change by reverting its pull request, and verify removal on the device.
-- Add a Linux host and manage a Linux policy through the same pipeline.
+- Add an SSH hardening policy for the Linux host: no root login and no password authentication.
+- Bump `actions/checkout` off Node 20, which GitHub Actions now warns about.
 - Separate staging and production instances, with changes promoted between them.
