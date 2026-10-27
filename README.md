@@ -88,7 +88,7 @@ I removed both fallbacks in [`.github/gitops-action/action.yml`](.github/gitops-
 
 - Change: a policy, **Linux - Automatic security updates enabled**, that checks the `unattended-upgrades` package is installed and that `20auto-upgrades` enables both the daily package list refresh and unattended upgrades, plus `linux-unattended-upgrades-enable.sh` to install the package, write the file, and enable the apt timers. The query uses the same `file` table check from pull request #8.
 - Before merging: the live query returned one row. Ubuntu Server ships with this on, so the policy started out passing.
-- Drift test: changed `Unattended-Upgrade` from `"1"` to `"0"` on the host. The live query returned no rows. Ran the script from the host's Actions menu and it completed successfully.
+- Drift test: changed `Unattended-Upgrade` from `"1"` to `"0"` on the host. The live query returned no rows. Ran the script from the host's Actions menu and it completed successfully. After a refetch the policy showed **Pass**.
 - What I learned: a control that already passes still needs proof that it catches drift. Breaking it on purpose is the only way to see the failure path.
 
 ## Limits
