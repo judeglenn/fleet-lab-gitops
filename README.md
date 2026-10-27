@@ -75,6 +75,22 @@ I removed both fallbacks in [`.github/gitops-action/action.yml`](.github/gitops-
 - Verified: SSH from the Mac still connected through the firewall, the same live query returned one row, and after a refetch the policy showed **Pass**.
 - What I learned: the policy did not update when the script finished. Fleet re-checks policies on its own schedule, so a refetch was needed to see the new result.
 
+**Harden SSH on the Linux host** ([pull request #8](https://github.com/judeglenn/fleet-lab-gitops/pull/8)).
+
+- Change: a policy, **Linux - SSH hardened (no root login, no passwords)**, plus `linux-ssh-harden.sh`, which writes `/etc/ssh/sshd_config.d/00-fleet-hardening.conf`, validates it with `sshd -t`, and reloads ssh. sshd keeps the first value it reads for each setting, so the `00-` name makes this file win over later drop-ins such as `50-cloud-init.conf`.
+- Lockout guard: the script refuses to run unless a regular user has an SSH key in `authorized_keys`, and rolls back if `sshd -t` rejects the new file.
+- Before merging: the policy query errored on the host with `error generating table: file does not exist`. `file_lines` errors on a missing file instead of returning no rows, and an errored policy reports no result instead of a failure. A host that was never hardened would never have shown as failing. Fixed by checking the `file` table first and reading lines only when the file exists. Re-ran live: no rows, no error.
+- After the apply: the policy showed **Fail**. Ran the script from the host's Actions menu. Output listed `labuser` as having a key, then `permitrootlogin no`, `passwordauthentication no`, and `kbdinteractiveauthentication no`.
+- Verified from the Mac: forcing password authentication was refused with `Permission denied (publickey)`, key login still worked, and after a refetch the policy showed **Pass**.
+- What I learned: a policy is only as good as its failure path. Test the query against the broken state, not just the fixed one.
+
+**Turn on automatic security updates on the Linux host** ([pull request #9](https://github.com/judeglenn/fleet-lab-gitops/pull/9)).
+
+- Change: a policy, **Linux - Automatic security updates enabled**, that checks the `unattended-upgrades` package is installed and that `20auto-upgrades` enables both the daily package list refresh and unattended upgrades, plus `linux-unattended-upgrades-enable.sh` to install the package, write the file, and enable the apt timers. The query uses the same `file` table check from pull request #8.
+- Before merging: the live query returned one row. Ubuntu Server ships with this on, so the policy started out passing.
+- Drift test: changed `Unattended-Upgrade` from `"1"` to `"0"` on the host. The live query returned no rows. Ran the script from the host's Actions menu and it completed successfully.
+- What I learned: a control that already passes still needs proof that it catches drift. Breaking it on purpose is the only way to see the failure path.
+
 ## Limits
 
 - **Scale.** Two VMs. This shows the workflow, not fleet-scale operation.
@@ -83,7 +99,7 @@ I removed both fallbacks in [`.github/gitops-action/action.yml`](.github/gitops-
 - **Console not locked.** Fleet's GitOps-only console mode is Premium. Changes made in the console are overwritten by the next apply, but they are not blocked.
 - **Drift is corrected, not detected.** Fleet's dry-run output lists every section it would apply, including "would've updated 4 labels" on a configuration exported from the live server. It doesn't show what actually differs, so the nightly run fixes drift without reporting it.
 - **Remediation is manual.** Running a script automatically when a policy fails is a Premium feature, and so is targeting a policy by label. On the free tier, the Linux policy detects and flags, a person runs the fix from Fleet, and the policy is scoped by platform rather than label. Scripts are also listed for every host, macOS included, so Linux scripts carry a `linux-` prefix.
-- **No macOS profile enforced on a device yet.** A firewall profile is defined in this repo and listed in Fleet, but it has not been delivered to the macOS VM. See the open issue below. The Linux firewall policy is enforced and verified.
+- **No macOS profile enforced on a device yet.** A firewall profile is defined in this repo and listed in Fleet, but it has not been delivered to the macOS VM. See the open issue below. The three Linux policies (firewall, SSH, automatic updates) are enforced and verified.
 
 ## Open issue: profile delivery
 
@@ -119,6 +135,5 @@ Lessons:
 - Enroll a physical Mac to confirm or rule out the push token cause.
 - Add drift detection: export the live configuration nightly, diff it against the repo, and fail with the diff before re-applying.
 - Roll back a deliberately bad change by reverting its pull request, and verify removal on the device.
-- Add an SSH hardening policy for the Linux host: no root login and no password authentication.
 - Bump `actions/checkout` off Node 20, which GitHub Actions now warns about.
 - Separate staging and production instances, with changes promoted between them.
