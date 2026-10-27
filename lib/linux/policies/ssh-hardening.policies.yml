@@ -1,0 +1,24 @@
+- name: Linux - SSH hardened (no root login, no passwords)
+  platform: linux
+  critical: false
+  description: >-
+    Checks that the Fleet-managed sshd drop-in exists and sets
+    PermitRootLogin no and PasswordAuthentication no. sshd uses the first value
+    it reads for each setting, and the drop-in is named 00-* so it loads before
+    other drop-ins such as 50-cloud-init.conf, which can turn passwords back on.
+    Fails if the file is missing or either line is absent. The query checks
+    the file table first because file_lines errors on a missing file, and an
+    errored policy reports no result instead of a failure.
+  resolution: >-
+    Make sure your SSH key is installed on the host first (ssh-copy-id), then
+    run linux-ssh-harden.sh on this host (host details, Actions, Run script).
+    The script refuses to run if no user has an authorized SSH key, so it
+    cannot lock you out.
+  query: >-
+    SELECT 1 FROM file
+    WHERE path = '/etc/ssh/sshd_config.d/00-fleet-hardening.conf'
+    AND (
+      SELECT COUNT(DISTINCT line) FROM file_lines
+      WHERE path = '/etc/ssh/sshd_config.d/00-fleet-hardening.conf'
+      AND line IN ('PermitRootLogin no', 'PasswordAuthentication no')
+    ) = 2;

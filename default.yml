@@ -5,6 +5,7 @@ controls:
       - path: ./lib/macos/firewall.mobileconfig
   scripts:
     - path: ./lib/linux/scripts/linux-ufw-enable.sh
+    - path: ./lib/linux/scripts/linux-ssh-harden.sh
 custom_host_vitals:
 labels:
 - description: macOS hosts on Apple Silicon architecture
@@ -106,4 +107,5 @@ org_settings:
   yara_rules:
 policies:
 - path: ./lib/linux/policies/ufw-enabled.policies.yml
+- path: ./lib/linux/policies/ssh-hardening.policies.yml
 reports:
