@@ -1,0 +1,28 @@
+- name: Linux - Automatic security updates enabled
+  platform: linux
+  critical: false
+  description: >-
+    Checks that unattended-upgrades is installed and that
+    /etc/apt/apt.conf.d/20auto-upgrades turns on both the daily package list
+    refresh and unattended upgrades. Fails if the package or either setting is
+    missing. The query checks the file table first because file_lines errors
+    on a missing file, and an errored policy reports no result instead of a
+    failure.
+  resolution: >-
+    Run linux-unattended-upgrades-enable.sh on this host (host details,
+    Actions, Run script). It installs unattended-upgrades if needed, writes
+    20auto-upgrades, and enables the apt timers.
+  query: >-
+    SELECT 1 FROM file
+    WHERE path = '/etc/apt/apt.conf.d/20auto-upgrades'
+    AND EXISTS (
+      SELECT 1 FROM deb_packages WHERE name = 'unattended-upgrades'
+    )
+    AND (
+      SELECT COUNT(DISTINCT line) FROM file_lines
+      WHERE path = '/etc/apt/apt.conf.d/20auto-upgrades'
+      AND (
+        REPLACE(line, ' ', '') = 'APT::Periodic::Update-Package-Lists"1";'
+        OR REPLACE(line, ' ', '') = 'APT::Periodic::Unattended-Upgrade"1";'
+      )
+    ) = 2;
