@@ -6,6 +6,7 @@ controls:
   scripts:
     - path: ./lib/linux/scripts/linux-ufw-enable.sh
     - path: ./lib/linux/scripts/linux-ssh-harden.sh
+    - path: ./lib/linux/scripts/linux-unattended-upgrades-enable.sh
 custom_host_vitals:
 labels:
 - description: macOS hosts on Apple Silicon architecture
@@ -108,4 +109,5 @@ org_settings:
 policies:
 - path: ./lib/linux/policies/ufw-enabled.policies.yml
 - path: ./lib/linux/policies/ssh-hardening.policies.yml
+- path: ./lib/linux/policies/unattended-upgrades.policies.yml
 reports:
